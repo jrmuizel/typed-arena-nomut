@@ -14,7 +14,7 @@
 //! ## Example
 //!
 //! ```
-//! use typed_arena::Arena;
+//! use typed_arena_nomut::Arena;
 //!
 //! struct Monster {
 //!     level: u32,
@@ -34,7 +34,7 @@
 //!
 //! ```
 //! use std::cell::Cell;
-//! use typed_arena::Arena;
+//! use typed_arena_nomut::Arena;
 //!
 //! struct CycleParticipant<'a> {
 //!     other: Cell<Option<&'a CycleParticipant<'a>>>,
@@ -72,6 +72,7 @@ use core::iter;
 use core::mem;
 use core::slice;
 use core::str;
+use std::cell::Ref;
 
 use mem::MaybeUninit;
 
@@ -88,7 +89,7 @@ const MIN_CAPACITY: usize = 1;
 /// ## Example
 ///
 /// ```
-/// use typed_arena::Arena;
+/// use typed_arena_nomut::Arena;
 ///
 /// struct Monster {
 ///     level: u32,
@@ -114,7 +115,7 @@ impl<T> Arena<T> {
     /// ## Example
     ///
     /// ```
-    /// use typed_arena::Arena;
+    /// use typed_arena_nomut::Arena;
     ///
     /// let arena = Arena::new();
     /// # arena.alloc(1);
@@ -129,7 +130,7 @@ impl<T> Arena<T> {
     /// ## Example
     ///
     /// ```
-    /// use typed_arena::Arena;
+    /// use typed_arena_nomut::Arena;
     ///
     /// let arena = Arena::with_capacity(1337);
     /// # arena.alloc(1);
@@ -151,7 +152,7 @@ impl<T> Arena<T> {
     /// ## Example
     ///
     /// ```
-    ///  use typed_arena::Arena;
+    ///  use typed_arena_nomut::Arena;
     ///
     ///  let arena = Arena::with_capacity(0);
     ///  let a = arena.alloc(1);
@@ -176,20 +177,20 @@ impl<T> Arena<T> {
     /// ## Example
     ///
     /// ```
-    /// use typed_arena::Arena;
+    /// use typed_arena_nomut::Arena;
     ///
     /// let arena = Arena::new();
     /// let x = arena.alloc(42);
     /// assert_eq!(*x, 42);
     /// ```
     #[inline]
-    pub fn alloc(&self, value: T) -> &mut T {
+    pub fn alloc(&self, value: T) -> &T {
         self.alloc_fast_path(value)
             .unwrap_or_else(|value| self.alloc_slow_path(value))
     }
 
     #[inline]
-    fn alloc_fast_path(&self, value: T) -> Result<&mut T, T> {
+    fn alloc_fast_path(&self, value: T) -> Result<&T, T> {
         let mut chunks = self.chunks.borrow_mut();
         let len = chunks.current.len();
         if len < chunks.current.capacity() {
@@ -203,8 +204,8 @@ impl<T> Arena<T> {
         }
     }
 
-    fn alloc_slow_path(&self, value: T) -> &mut T {
-        &mut self.alloc_extend(iter::once(value))[0]
+    fn alloc_slow_path(&self, value: T) -> &T {
+        &self.alloc_extend(iter::once(value))[0]
     }
 
     /// Uses the contents of an iterator to allocate values in the arena.
@@ -213,13 +214,13 @@ impl<T> Arena<T> {
     /// ## Example
     ///
     /// ```
-    /// use typed_arena::Arena;
+    /// use typed_arena_nomut::Arena;
     ///
     /// let arena = Arena::new();
     /// let abc = arena.alloc_extend("abcdefg".chars().take(3));
     /// assert_eq!(abc, ['a', 'b', 'c']);
     /// ```
-    pub fn alloc_extend<I>(&self, iterable: I) -> &mut [T]
+    pub fn alloc_extend<I>(&self, iterable: I) -> &[T]
     where
         I: IntoIterator<Item = T>,
     {
@@ -289,7 +290,7 @@ impl<T> Arena<T> {
     /// ```rust
     /// use std::mem::{self, MaybeUninit};
     /// use std::ptr;
-    /// use typed_arena::Arena;
+    /// use typed_arena_nomut::Arena;
     ///
     /// // Transmute from MaybeUninit slice to slice of initialized T.
     /// // It is a separate function to preserve the lifetime of the reference.
@@ -319,7 +320,7 @@ impl<T> Arena<T> {
     /// ```rust
     /// use std::mem::{self, MaybeUninit};
     /// use std::ptr;
-    /// use typed_arena::Arena;
+    /// use typed_arena_nomut::Arena;
     ///
     /// unsafe fn transmute_uninit<A>(r: &mut [MaybeUninit<A>]) -> &mut [A] {
     ///     mem::transmute(r)
@@ -415,7 +416,7 @@ impl<T> Arena<T> {
     /// ## Example
     ///
     /// ```
-    /// use typed_arena::Arena;
+    /// use typed_arena_nomut::Arena;
     ///
     /// let arena = Arena::new();
     ///
@@ -449,23 +450,24 @@ impl<T> Arena<T> {
     /// ## Example
     ///
     /// ```
-    /// use typed_arena::Arena;
+    /// use typed_arena_nomut::Arena;
+    /// use std::cell::Cell;
     ///
     /// #[derive(Debug, PartialEq, Eq)]
-    /// struct Point { x: i32, y: i32 };
+    /// struct Point { x: Cell<i32>, y: i32 };
     ///
     /// let mut arena = Arena::new();
     ///
-    /// arena.alloc(Point { x: 0, y: 0 });
-    /// arena.alloc(Point { x: 1, y: 1 });
+    /// arena.alloc(Point { x: Cell::new(0), y: 0 });
+    /// arena.alloc(Point { x: Cell::new(1), y: 1 });
     ///
-    /// for point in arena.iter_mut() {
-    ///     point.x += 10;
+    /// for point in arena.iter() {
+    ///     point.x.set(point.x.get() + 10);
     /// }
     ///
     /// let points = arena.into_vec();
     ///
-    /// assert_eq!(points, vec![Point { x: 10, y: 0 }, Point { x: 11, y: 1 }]);
+    /// assert_eq!(points, vec![Point { x: Cell::new(10), y: 0 }, Point { x: Cell::new(11), y: 1 }]);
     ///
     /// ```
     ///
@@ -474,38 +476,37 @@ impl<T> Arena<T> {
     /// Note that there is no corresponding `iter` method. Access to the arena's contents
     /// requries mutable access to the arena itself.
     ///
-    /// ```compile_fail
-    /// use typed_arena::Arena;
+    /// ```
+    /// use typed_arena_nomut::Arena;
+    /// use std::cell::Cell;
     ///
     /// let mut arena = Arena::new();
-    /// let x = arena.alloc(1);
+    /// let x = arena.alloc(Cell::new(1));
     ///
-    /// // borrow error!
-    /// for i in arena.iter_mut() {
-    ///     println!("i: {}", i);
+    /// for i in arena.iter() {
+    ///     println!("i: {}", i.get());
     /// }
     ///
-    /// // borrow error!
-    /// *x = 2;
+    /// x.set(x.get() * 2);
     /// ```
     #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<T> {
-        let chunks = self.chunks.get_mut();
+    pub fn iter(&self) -> Iter<T> {
+        let chunks = self.chunks.borrow();
         let position = if !chunks.rest.is_empty() {
             let index = 0;
-            let inner_iter = chunks.rest[index].iter_mut();
+            let inner_iter = chunks.rest[index].iter();
             // Extend the lifetime of the individual elements to that of the arena.
             // This is OK because we borrow the arena mutably to prevent new allocations
             // and we take care here to never move items inside the arena while the
             // iterator is alive.
             let inner_iter = unsafe { mem::transmute(inner_iter) };
-            IterMutState::ChunkListRest { index, inner_iter }
+            IterState::ChunkListRest { index, inner_iter }
         } else {
             // Extend the lifetime of the individual elements to that of the arena.
-            let iter = unsafe { mem::transmute(chunks.current.iter_mut()) };
-            IterMutState::ChunkListCurrent { iter }
+            let iter = unsafe { mem::transmute(chunks.current.iter()) };
+            IterState::ChunkListCurrent { iter }
         };
-        IterMut {
+        Iter {
             chunks,
             state: position,
         }
@@ -521,17 +522,17 @@ impl Arena<u8> {
     /// # Example
     ///
     /// ```
-    /// use typed_arena::Arena;
+    /// use typed_arena_nomut::Arena;
     ///
     /// let arena: Arena<u8> = Arena::new();
     /// let hello = arena.alloc_str("Hello world");
     /// assert_eq!("Hello world", hello);
     /// ```
     #[inline]
-    pub fn alloc_str(&self, s: &str) -> &mut str {
+    pub fn alloc_str(&self, s: &str) -> & str {
         let buffer = self.alloc_extend(s.bytes());
         // Can't fail the utf8 validation, it already came in as utf8
-        unsafe { str::from_utf8_unchecked_mut(buffer) }
+        unsafe { str::from_utf8_unchecked(buffer) }
     }
 }
 
@@ -559,30 +560,30 @@ impl<T> ChunkList<T> {
     }
 }
 
-enum IterMutState<'a, T> {
+enum IterState<'a, T> {
     ChunkListRest {
         index: usize,
-        inner_iter: slice::IterMut<'a, T>,
+        inner_iter: slice::Iter<'a, T>,
     },
     ChunkListCurrent {
-        iter: slice::IterMut<'a, T>,
+        iter: slice::Iter<'a, T>,
     },
 }
 
 /// Mutable arena iterator.
 ///
 /// This struct is created by the [`iter_mut`](struct.Arena.html#method.iter_mut) method on [Arenas](struct.Arena.html).
-pub struct IterMut<'a, T: 'a> {
-    chunks: &'a mut ChunkList<T>,
-    state: IterMutState<'a, T>,
+pub struct Iter<'a, T: 'a> {
+    chunks: Ref<'a, ChunkList<T>>,
+    state: IterState<'a, T>,
 }
 
-impl<'a, T> Iterator for IterMut<'a, T> {
-    type Item = &'a mut T;
-    fn next(&mut self) -> Option<&'a mut T> {
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<&'a T> {
         loop {
             self.state = match self.state {
-                IterMutState::ChunkListRest {
+                IterState::ChunkListRest {
                     mut index,
                     ref mut inner_iter,
                 } => {
@@ -591,20 +592,20 @@ impl<'a, T> Iterator for IterMut<'a, T> {
                         None => {
                             index += 1;
                             if index < self.chunks.rest.len() {
-                                let inner_iter = self.chunks.rest[index].iter_mut();
+                                let inner_iter = self.chunks.rest[index].iter();
                                 // Extend the lifetime of the individual elements to that of the arena.
                                 let inner_iter = unsafe { mem::transmute(inner_iter) };
-                                IterMutState::ChunkListRest { index, inner_iter }
+                                IterState::ChunkListRest { index, inner_iter }
                             } else {
-                                let iter = self.chunks.current.iter_mut();
+                                let iter = self.chunks.current.iter();
                                 // Extend the lifetime of the individual elements to that of the arena.
                                 let iter = unsafe { mem::transmute(iter) };
-                                IterMutState::ChunkListCurrent { iter }
+                                IterState::ChunkListCurrent { iter }
                             }
                         }
                     }
                 }
-                IterMutState::ChunkListCurrent { ref mut iter } => return iter.next(),
+                IterState::ChunkListCurrent { ref mut iter } => return iter.next(),
             };
         }
     }

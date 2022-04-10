@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate criterion;
-extern crate typed_arena;
+extern crate typed_arena_nomut;
 
 use criterion::{Criterion, BenchmarkId};
 
@@ -11,9 +11,9 @@ struct Small(usize);
 struct Big([usize; 32]);
 
 fn allocate<T: Default>(n: usize) {
-    let arena = typed_arena::Arena::new();
+    let arena = typed_arena_nomut::Arena::new();
     for _ in 0..n {
-        let val: &mut T = arena.alloc(Default::default());
+        let val: &T = arena.alloc(Default::default());
         criterion::black_box(val);
     }
 }

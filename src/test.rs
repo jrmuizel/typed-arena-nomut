@@ -240,7 +240,7 @@ fn iter_mut_low_capacity() {
     const MAX: usize = 1_000;
     const CAP: usize = 16;
 
-    let mut arena = Arena::with_capacity(CAP);
+    let arena = Arena::with_capacity(CAP);
     for i in 1..MAX {
         arena.alloc(NonCopy(i));
     }
@@ -250,9 +250,9 @@ fn iter_mut_low_capacity() {
         "expected multiple chunks"
     );
 
-    let mut iter = arena.iter_mut();
+    let mut iter = arena.iter();
     for i in 1..MAX {
-        assert_eq!(Some(&mut NonCopy(i)), iter.next());
+        assert_eq!(Some(&NonCopy(i)), iter.next());
     }
 
     assert_eq!(None, iter.next());
@@ -266,7 +266,7 @@ fn iter_mut_high_capacity() {
     const MAX: usize = 1_000;
     const CAP: usize = 8192;
 
-    let mut arena = Arena::with_capacity(CAP);
+    let arena = Arena::with_capacity(CAP);
     for i in 1..MAX {
         arena.alloc(NonCopy(i));
     }
@@ -276,15 +276,15 @@ fn iter_mut_high_capacity() {
         "expected single chunk"
     );
 
-    let mut iter = arena.iter_mut();
+    let mut iter = arena.iter();
     for i in 1..MAX {
-        assert_eq!(Some(&mut NonCopy(i)), iter.next());
+        assert_eq!(Some(&NonCopy(i)), iter.next());
     }
 
     assert_eq!(None, iter.next());
 }
 
-fn assert_size_hint<T>(arena_len: usize, iter: IterMut<'_, T>) {
+fn assert_size_hint<T>(arena_len: usize, iter: Iter<'_, T>) {
     let (min, max) = iter.size_hint();
 
     assert!(max.is_some());
@@ -308,10 +308,10 @@ fn size_hint() {
     const CAP: usize = 0;
 
     for cap in CAP..(CAP + 16/* check some non-power-of-two capacities */) {
-        let mut arena = Arena::with_capacity(cap);
+        let arena = Arena::with_capacity(cap);
         for i in 1..MAX {
             arena.alloc(NonCopy(i));
-            let iter = arena.iter_mut();
+            let iter = arena.iter();
             assert_size_hint(i, iter);
         }
     }
@@ -327,10 +327,10 @@ fn size_hint_low_initial_capacities() {
     const CAP: usize = 0;
 
     for cap in CAP..(CAP + 128/* check some non-power-of-two capacities */) {
-        let mut arena = Arena::with_capacity(cap);
+        let arena = Arena::with_capacity(cap);
         for i in 1..MAX {
             arena.alloc(NonCopy(i));
-            let iter = arena.iter_mut();
+            let iter = arena.iter();
             assert_size_hint(i, iter);
         }
     }
@@ -346,10 +346,10 @@ fn size_hint_high_initial_capacities() {
     const CAP: usize = 8164;
 
     for cap in CAP..(CAP + 128/* check some non-power-of-two capacities */) {
-        let mut arena = Arena::with_capacity(cap);
+        let arena = Arena::with_capacity(cap);
         for i in 1..MAX {
             arena.alloc(NonCopy(i));
-            let iter = arena.iter_mut();
+            let iter = arena.iter();
             assert_size_hint(i, iter);
         }
     }
@@ -364,10 +364,10 @@ fn size_hint_many_items() {
     const MAX: usize = 5_000_000;
     const CAP: usize = 16;
 
-    let mut arena = Arena::with_capacity(CAP);
+    let arena = Arena::with_capacity(CAP);
     for i in 1..MAX {
         arena.alloc(NonCopy(i));
-        let iter = arena.iter_mut();
+        let iter = arena.iter();
         assert_size_hint(i, iter);
     }
 }

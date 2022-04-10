@@ -1,9 +1,11 @@
-# `typed-arena`
+# `typed-arena-nomut`
 
-[![](https://docs.rs/typed-arena/badge.svg)](https://docs.rs/typed-arena/)
-[![](https://img.shields.io/crates/v/typed-arena.svg)](https://crates.io/crates/typed-arena)
-[![](https://img.shields.io/crates/d/typed-arena.svg)](https://crates.io/crates/typed-arena)
-[![Travis CI Build Status](https://travis-ci.org/SimonSapin/rust-typed-arena.svg?branch=master)](https://travis-ci.org/SimonSapin/typed-arena)
+[![](https://docs.rs/typed-arena-nomut/badge.svg)](https://docs.rs/typed-arena-nomut/)
+[![](https://img.shields.io/crates/v/typed-arena-nomut.svg)](https://crates.io/crates/typed-arena-nomut)
+[![](https://img.shields.io/crates/d/typed-arena-nomut.svg)](https://crates.io/crates/typed-arena-nomut)
+
+This is a fork of the typed-arena arena crate that returns an immutable reference instead of
+mutable one. This allows iteration on the arena items while they're borrowed.
 
 **A fast (but limited) allocation arena for values of a single type.**
 
@@ -14,10 +16,11 @@ alive. The flipside is that allocation is fast: typically just a vector push.
 There is also a method `into_vec()` to recover ownership of allocated objects
 when the arena is no longer required, instead of destroying everything.
 
+
 ## Example
 
 ```rust
-use typed_arena::Arena;
+use typed_arena_nomut::Arena;
 
 struct Monster {
     level: u32,
@@ -37,7 +40,7 @@ and trees with parent pointers.
 
 ```rust
 use std::cell::Cell;
-use typed_arena::Arena;
+use typed_arena_nomut::Arena;
 
 struct CycleParticipant<'a> {
     other: Cell<Option<&'a CycleParticipant<'a>>>,
