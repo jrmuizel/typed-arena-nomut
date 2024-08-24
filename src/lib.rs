@@ -72,7 +72,7 @@ use core::iter;
 use core::mem;
 use core::slice;
 use core::str;
-use std::cell::Ref;
+use core::cell::Ref;
 
 use mem::MaybeUninit;
 
